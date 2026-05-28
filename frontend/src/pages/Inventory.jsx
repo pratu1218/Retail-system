@@ -6,16 +6,20 @@ import toast from "react-hot-toast";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { useAuth } from "../context/AuthContext";
 
+
 const empty = {
   name: "", category: "", price: "",
   quantity: "", lowStockThreshold: 10,
   barcode: "", description: ""
 };
 
+
 const Inventory = () => {
+
 
   const { userInfo } = useAuth();
   const isAdmin = userInfo?.role === "admin";
+
 
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -24,8 +28,10 @@ const Inventory = () => {
   const [form, setForm] = useState(empty);
   const [showScanner, setShowScanner] = useState(false);
 
+
   const load = () => getProducts({ search }).then(r => setProducts(r.data));
   useEffect(() => { load(); }, [search]);
+
 
   const openAdd = () => {
     if (!isAdmin) return;
@@ -34,8 +40,10 @@ const Inventory = () => {
     setShowModal(true);
   };
 
+
   const openEdit = (p) => {
     if (!isAdmin) return;
+
 
     setForm({
       name: p.name, category: p.category || "",
@@ -47,9 +55,11 @@ const Inventory = () => {
     setShowModal(true);
   };
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAdmin) return;
+
 
     try {
       if (editing) {
@@ -66,8 +76,10 @@ const Inventory = () => {
     }
   };
 
+
   const handleDelete = async (id) => {
     if (!isAdmin) return;
+
 
     if (!window.confirm("Delete this product?")) return;
     try {
@@ -79,17 +91,20 @@ const Inventory = () => {
     }
   };
 
+
   const handleBarcodeScan = (code) => {
     setForm(prev => ({ ...prev, barcode: code }));
     setShowScanner(false);
     toast.success(`Barcode captured: ${code}`);
   };
 
+
   // Helper functions to increment/decrement with validation
   const incrementValue = (field, min = 0) => {
     const currentValue = parseFloat(form[field]) || 0;
     setForm({ ...form, [field]: currentValue + 1 });
   };
+
 
   const decrementValue = (field, min = 0) => {
     const currentValue = parseFloat(form[field]) || 0;
@@ -98,6 +113,7 @@ const Inventory = () => {
     }
   };
 
+
   const handleNumberChange = (field, value, min = 0) => {
     const numValue = parseFloat(value);
     if (value === "" || (numValue >= min)) {
@@ -105,10 +121,12 @@ const Inventory = () => {
     }
   };
 
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc" }}>
       <Sidebar />
       <main style={{ marginLeft: "240px", flex: 1, padding: "32px" }}>
+
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
@@ -118,6 +136,7 @@ const Inventory = () => {
               {products.length} products
             </p>
           </div>
+
 
           {isAdmin && (
             <button
@@ -151,6 +170,7 @@ const Inventory = () => {
           )}
         </div>
 
+
         {/* Search */}
         <div style={{ position: "relative", marginBottom: "20px" }}>
           <Search size={16} style={{
@@ -169,6 +189,7 @@ const Inventory = () => {
             }}
           />
         </div>
+
 
         {/* Products Table */}
         <div style={{
@@ -209,17 +230,21 @@ const Inventory = () => {
                     )}
                   </td>
 
+
                   <td style={{ padding: "12px 16px", fontSize: "13px", color: "#374151" }}>
                     {p.category || "—"}
                   </td>
+
 
                   <td style={{ padding: "12px 16px", fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
                     ₹{p.price}
                   </td>
 
+
                   <td style={{ padding: "12px 16px", fontSize: "14px", color: "#374151" }}>
                     {p.quantity} units
                   </td>
+
 
                   <td style={{ padding: "12px 16px" }}>
                     {p.barcode ? (
@@ -235,6 +260,7 @@ const Inventory = () => {
                     )}
                   </td>
 
+
                   <td style={{ padding: "12px 16px" }}>
                     <span style={{
                       padding: "4px 10px", borderRadius: "999px",
@@ -245,6 +271,7 @@ const Inventory = () => {
                       {p.isLowStock ? "Low Stock" : "In Stock"}
                     </span>
                   </td>
+
 
                   {isAdmin && (
                     <td style={{ padding: "12px 16px" }}>
@@ -259,6 +286,7 @@ const Inventory = () => {
                           <Pencil size={14} color="#3b82f6" />
                         </button>
 
+
                         <button
                           onClick={() => handleDelete(p._id)}
                           style={{
@@ -272,12 +300,14 @@ const Inventory = () => {
                     </td>
                   )}
 
+
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </main>
+
 
       {/* Enhanced Modal */}
       {showModal && isAdmin && (
@@ -309,6 +339,7 @@ const Inventory = () => {
             onClick={e => e.stopPropagation()}
           >
 
+
             {/* Modal header */}
             <div style={{
               padding: "24px 24px 20px",
@@ -339,6 +370,7 @@ const Inventory = () => {
                 </div>
               </div>
 
+
               <button
                 onClick={() => setShowModal(false)}
                 style={{
@@ -360,7 +392,9 @@ const Inventory = () => {
               </button>
             </div>
 
+
             <form onSubmit={handleSubmit} style={{ padding: "24px" }}>
+
 
               {/* Product Name */}
               <div style={{ marginBottom: "20px" }}>
@@ -399,6 +433,7 @@ const Inventory = () => {
                 />
               </div>
 
+
               {/* Category */}
               <div style={{ marginBottom: "20px" }}>
                 <label style={{
@@ -434,6 +469,7 @@ const Inventory = () => {
                   }}
                 />
               </div>
+
 
               {/* Description */}
               <div style={{ marginBottom: "20px" }}>
@@ -474,6 +510,7 @@ const Inventory = () => {
                 />
               </div>
 
+
               {/* Barcode */}
               <div style={{ marginBottom: "20px" }}>
                 <label style={{
@@ -485,6 +522,7 @@ const Inventory = () => {
                 }}>
                   Barcode
                 </label>
+
 
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input
@@ -510,30 +548,9 @@ const Inventory = () => {
                     }}
                   />
 
-                  <button
-                    type="button"
-                    onClick={() => setShowScanner(true)}
-                    style={{
-                      padding: "12px 16px",
-                      background: "#0f172a",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontWeight: 600,
-                      fontSize: "13px",
-                      transition: "all 0.2s ease"
-                    }}
-                    onMouseOver={e => e.currentTarget.style.background = "#1e293b"}
-                    onMouseOut={e => e.currentTarget.style.background = "#0f172a"}
-                  >
-                    <ScanLine size={16} /> Scan
-                  </button>
                 </div>
               </div>
+
 
               {/* Price, Quantity, Low Stock with increment/decrement */}
               <div style={{
@@ -629,6 +646,7 @@ const Inventory = () => {
                   </div>
                 </div>
 
+
                 {/* Quantity */}
                 <div>
                   <label style={{
@@ -714,6 +732,7 @@ const Inventory = () => {
                     </div>
                   </div>
                 </div>
+
 
                 {/* Low Stock Threshold */}
                 <div>
@@ -801,6 +820,7 @@ const Inventory = () => {
                 </div>
               </div>
 
+
               {/* Action Buttons */}
               <div style={{ display: "flex", gap: "12px" }}>
                 <button
@@ -829,6 +849,7 @@ const Inventory = () => {
                 >
                   Cancel
                 </button>
+
 
                 <button
                   type="submit"
@@ -863,27 +884,30 @@ const Inventory = () => {
                 </button>
               </div>
 
+
             </form>
           </div>
 
+
           <style>{`
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes slideUp {
-              from {
-                opacity: 0;
-                transform: translateY(20px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-          `}</style>
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}</style>
         </div>
       )}
+
 
       {showScanner && (
         <BarcodeScanner
@@ -892,8 +916,10 @@ const Inventory = () => {
         />
       )}
 
+
     </div>
   );
 };
+
 
 export default Inventory;

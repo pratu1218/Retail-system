@@ -1,5 +1,6 @@
 import asyncHandler from "express-async-handler";
 import Product from "../models/Product.js";
+import Transaction from "../models/Transaction.js";
 
 const getShopId = (req, res) => {
   if (!req.user || !req.user.shopId) {
@@ -123,4 +124,48 @@ export const getLowStockProducts = asyncHandler(async (req, res) => {
   });
 
   res.json(products);
+});
+
+export const getTransactions = asyncHandler(async (req, res) => {
+  const { period } = req.query;
+  const now = new Date();
+  let startDate;
+
+  if (period === "today") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (period === "week") {
+    startDate = new Date(now);
+    startDate.setDate(now.getDate() - 7);
+  } else if (period === "month") {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  const shopId = getShopId(req, res);
+  const query = { shopId };
+  if (startDate) query.createdAt = { $gte: startDate };
+
+  const transactions = await Transaction.find(query)
+    .populate("items.product", "name price")
+    .populate("servedBy", "name email")
+    .sort({ createdAt: -1 });
+
+  res.json(transactions);
+});
+
+export const getTransactionById = asyncHandler(async (req, res) => {
+  const shopId = getShopId(req, res);
+
+  const transaction = await Transaction.findOne({
+    _id: req.params.id,
+    shopId
+  })
+    .populate("items.product", "name price")
+    .populate("servedBy", "name email");
+
+  if (!transaction) {
+    res.status(404);
+    throw new Error("Transaction not found");
+  }
+
+  res.json(transaction);
 });

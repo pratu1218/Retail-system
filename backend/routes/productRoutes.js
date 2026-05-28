@@ -1,3 +1,5 @@
+
+
 import express from "express";
 import {
   getProducts,
@@ -6,7 +8,9 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  getLowStockProducts
+  getLowStockProducts,
+  getTransactions,
+  getTransactionById
 } from "../controllers/productController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -18,7 +22,11 @@ router.route("/")
   .post(protect, createProduct);
 
 router.get("/low-stock", protect, getLowStockProducts);
+
 router.get("/barcode/:barcode", protect, getProductByBarcode);
+
+router.get("/transactions", protect, getTransactions);
+router.get("/transactions/:id", protect, getTransactionById);
 
 router.route("/:id")
   .get(protect, getProductById)

@@ -1,9 +1,15 @@
+
+
 import axios from "axios";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
+const API = axios.create({
+  baseURL: "http://localhost:5000/api"
+});
 
 API.interceptors.request.use((req) => {
-  const user = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
+  const user = JSON.parse(
+    sessionStorage.getItem("userInfo") || "{}"
+  );
 
   if (user?.token) {
     req.headers.Authorization = `Bearer ${user.token}`;
@@ -12,44 +18,87 @@ API.interceptors.request.use((req) => {
   return req;
 });
 
+
 // ================= AUTH =================
 
-export const loginUser = (data) => API.post("/auth/login", data);
-export const registerUser = (data) => API.post("/auth/register", data);
-export const createCashier = (data) => API.post("/auth/create-cashier", data);
+export const loginUser = (data) =>
+  API.post("/auth/login", data);
+
+export const registerUser = (data) =>
+  API.post("/auth/register", data);
+
+export const createCashier = (data) =>
+  API.post("/auth/create-cashier", data);
+
 
 // ================= PRODUCTS =================
 
-export const getProducts = (params) => API.get("/products", { params });
-export const getProductByBarcode = (barcode) => API.get(`/products/barcode/${barcode}`);
-export const createProduct = (data) => API.post("/products", data);
-export const updateProduct = (id, data) => API.put(`/products/${id}`, data);
-export const deleteProduct = (id) => API.delete(`/products/${id}`);
-export const getLowStockProducts = () => API.get("/products/low-stock");
+export const getProducts = (params) =>
+  API.get("/products", { params });
+
+export const getProductByBarcode = (barcode) =>
+  API.get(`/products/barcode/${barcode}`);
+
+export const createProduct = (data) =>
+  API.post("/products", data);
+
+export const updateProduct = (id, data) =>
+  API.put(`/products/${id}`, data);
+
+export const deleteProduct = (id) =>
+  API.delete(`/products/${id}`);
+
+export const getLowStockProducts = () =>
+  API.get("/products/low-stock");
+
 
 // ================= BILLING =================
 
-export const checkout = (data) => API.post("/billing/checkout", data);
-export const getTransactions = () => API.get("/billing/transactions");
-export const getTransactionById = (id) => API.get(`/billing/transactions/${id}`);
+export const checkout = (data) =>
+  API.post("/billing/checkout", data);
+
+/*
+FIX:
+must call /products/transactions
+NOT /billing/transactions
+because backend route exists in productRoutes.js
+*/
+
+export const getTransactions = (period = "today") =>
+  API.get(`/products/transactions?period=${period}`);
+
+export const getTransactionById = (id) =>
+  API.get(`/products/transactions/${id}`);
+
 
 // ================= ANALYTICS =================
 
-export const getSummary = (period) => API.get(`/analytics/summary?period=${period}`);
-export const getTopProducts = () => API.get("/analytics/top-products");
-export const getDailySales = () => API.get("/analytics/daily-sales");
+export const getSummary = (period) =>
+  API.get(`/analytics/summary?period=${period}`);
 
-// ✅ ADDED (THIS FIXES YOUR ERROR)
-export const getSmartInsights = () => API.get("/analytics/smart-insights");
+export const getTopProducts = () =>
+  API.get("/analytics/top-products");
+
+export const getDailySales = () =>
+  API.get("/analytics/daily-sales");
+
+export const getSmartInsights = () =>
+  API.get("/analytics/smart-insights");
+
 
 // ================= AI =================
 
-export const getRestockSuggestions = () => API.get("/ai/restock-suggestions");
-export const getSlowMoving = () => API.get("/ai/slow-moving");
+export const getRestockSuggestions = () =>
+  API.get("/ai/restock-suggestions");
+
+export const getSlowMoving = () =>
+  API.get("/ai/slow-moving");
+
 
 // ================= CHATBOT (AXIOS NORMAL) =================
 
-export const sendChat = (data) => API.post("/chat", data);
+export const sendChat = (data) =>
+  API.post("/chat", data);
 
 
 // ==========================================================
@@ -58,21 +107,23 @@ export const sendChat = (data) => API.post("/chat", data);
 
 const API_BASE_URL = "http://localhost:5000/api";
 
-// Smart Chat (fetch version)
 export const sendChatAdvanced = async ({
   message,
   conversationHistory = [],
   systemPrompt = null
 }) => {
   try {
-
-    const user = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
+    const user = JSON.parse(
+      sessionStorage.getItem("userInfo") || "{}"
+    );
 
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: user?.token ? `Bearer ${user.token}` : ""
+        Authorization: user?.token
+          ? `Bearer ${user.token}`
+          : ""
       },
       body: JSON.stringify({
         message,
@@ -82,7 +133,9 @@ export const sendChatAdvanced = async ({
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(
+        `HTTP error! status: ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -103,35 +156,48 @@ export const sendChatStream = async ({
   systemPrompt = null,
   onChunk
 }) => {
+  const user = JSON.parse(
+    sessionStorage.getItem("userInfo") || "{}"
+  );
 
-  const user = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
-
-  const response = await fetch(`${API_BASE_URL}/chat/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: user?.token ? `Bearer ${user.token}` : ""
-    },
-    body: JSON.stringify({
-      message,
-      conversationHistory,
-      systemPrompt
-    })
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/chat/stream`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: user?.token
+          ? `Bearer ${user.token}`
+          : ""
+      },
+      body: JSON.stringify({
+        message,
+        conversationHistory,
+        systemPrompt
+      })
+    }
+  );
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(
+      `HTTP error! status: ${response.status}`
+    );
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+
   let fullResponse = "";
 
   while (true) {
     const { done, value } = await reader.read();
+
     if (done) break;
 
-    const chunk = decoder.decode(value, { stream: true });
+    const chunk = decoder.decode(value, {
+      stream: true
+    });
+
     fullResponse += chunk;
 
     onChunk(chunk, fullResponse);

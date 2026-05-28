@@ -6,240 +6,175 @@ import Product from "../models/Product.js";
 import Transaction from "../models/Transaction.js";
 import Groq from "groq-sdk";
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY
-});
-
-const DEFAULT_GROQ_MODEL =
-    process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 
 
-// Helper
-function safeStringifyTrim(obj, maxChars = 60000) {
-    try {
-        const s = JSON.stringify(obj);
-        return s.length > maxChars ? s.slice(0, maxChars) + "...(trimmed)" : s;
-    } catch (e) {
-        return "(unserializable)";
-    }
-}
+const detectContext = (message) => {
+    const lower = message.toLowerCase().trim();
 
 
-// Detect Business Question
-const isBusinessQuestion = (message) => {
-
-    const keywords = [
-        "sales",
-        "stock",
-        "inventory",
-        "product",
-        "profit",
-        "revenue",
-        "order",
-        "store",
-        "shop",
-        "customer",
-        "transaction",
-        "sell",
-        "low stock",
-        "top selling"
+    const storeKeywords = [
+        'stock', 'product', 'sale', 'order', 'inventory', 'customer', 'revenue',
+        'low stock', 'top selling', 'price', 'transaction', 'profit', 'buy/sell',
+        'winter', 'seasonal', 'restock', 'today'
     ];
 
-    return keywords.some(k =>
-        message.toLowerCase().includes(k)
-    );
+    const noStoreKeywords = [
+        'car', 'house', 'weather', 'recipe', 'joke', 'movie', 'travel',
+        'salary', 'family', 'health', 'fitness', 'personal'
+    ];
+
+    const storeScore = storeKeywords.filter(k => lower.includes(k)).length;
+    const noStoreScore = noStoreKeywords.filter(k => lower.includes(k)).length;
+
+    const isStore = storeScore > 0;
+    const isPersonal = noStoreScore > 0;
+
+    const mode = isStore ? 'STORE_ONLY' : isPersonal ? 'PERSONAL_ONLY' : 'GENERAL';
+
+    console.log(`🔍 "${message}" → STORE:${storeScore} PERSONAL:${noStoreScore} → ${mode}`);
+
+    return { isStore, isPersonal, mode };
 };
 
 
-// Build Summary
-const buildBusinessSummary = (products, transactions) => {
+const fetchStoreData = async (shopId) => {
+    // Parallel queries
+    const [products, transactions] = await Promise.all([
+        Product.find({ shopId }).lean(),
+        Transaction.find({ shopId }).sort({ createdAt: -1 }).limit(50).lean()
+    ]);
 
-    const totalProducts = products.length;
+    // Today’s sales
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTransactions = transactions.filter(t => new Date(t.createdAt) >= today);
+    const todaySales = todayTransactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0);
 
-    const lowStock = products
-        .filter(p => p.quantity <= (p.lowStockThreshold || 5))
-        .slice(0, 5);
+    // Low stock
+    const lowStock = products.filter(p => {
+        const qty = Number(p.quantity || 0);
+        return qty > 0 && qty <= (p.lowStockThreshold || 5);
+    });
 
-    const totalSales = transactions.reduce(
-        (sum, t) => sum + (t.totalAmount || 0),
-        0
-    );
-
-    const totalOrders = transactions.length;
-
-    const topProducts = {};
-
-    transactions.forEach(t => {
+    // Top products
+    const productSales = {};
+    transactions.slice(0, 30).forEach(t => {  // Recent focus
         t.items?.forEach(item => {
-            topProducts[item.productName] =
-                (topProducts[item.productName] || 0) + item.quantity;
+            const name = item.productName || item.product || 'Unknown';
+            productSales[name] = (productSales[name] || 0) + Number(item.quantity || 1);
         });
     });
 
-    const topSelling = Object.entries(topProducts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
+    const topProducts = Object.entries(productSales)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 6);
 
-    return {
-        totalProducts,
-        lowStock,
-        totalSales,
-        totalOrders,
-        topSelling
+    const storeData = {
+        timestamp: new Date().toLocaleString(),
+        totalProducts: products.length,
+        todaySales: todaySales,
+        todayOrders: todayTransactions.length,
+        totalSales: transactions.reduce((sum, t) => sum + Number(t.totalAmount || 0), 0),
+        lowStockCount: lowStock.length,
+        lowStock: lowStock.slice(0, 8).map(p => ({
+            name: p.name || p.title || 'Unnamed',
+            quantity: p.quantity,
+            price: p.price
+        })),
+        topProducts: topProducts.map(([name, qty]) => ({ name, quantity: qty.toString() })),
+        categories: [...new Set(products.map(p => p.category || p.name.split(' ')[0]))].slice(0, 5)
     };
+
+    console.log(`📈 Store: ${storeData.totalProducts}p | Today: $${storeData.todaySales} | Low: ${storeData.lowStockCount}`);
+    return storeData;
 };
 
+// 🔥 DUAL MODE PERFECTION
+const generateDualResponse = async (message, shopId, stream = false) => {
+    const context = detectContext(message);
 
-// Generate AI Response
-const generateResponse = async ({
-    message,
-    products,
-    transactions,
-    summary,
-    stream = false
-}) => {
+    if (context.isStore) {
+        // STORE MODE - FACTS ONLY
+        const storeData = await fetchStoreData(shopId);
 
-    const businessMode = isBusinessQuestion(message);
+        const systemPrompt = `GROCERY STORE MANAGER AI
 
-    let systemPrompt;
+📊 EXACT STORE DATA:
+TODAY: $${storeData.todaySales} (${storeData.todayOrders} orders)
+TOTAL: $${storeData.totalSales} (${storeData.totalOrders || 0} orders ever)
+PRODUCTS: ${storeData.totalProducts}
+LOW STOCK: ${storeData.lowStockCount}
 
-    // UPDATED PROMPT (FIXED CLEAN OUTPUT)
-    if (businessMode) {
-        systemPrompt = `
-You are an intelligent retail AI assistant.
+LOW STOCK ITEMS:
+${storeData.lowStock.map(p => `• ${p.name}: ${p.quantity} left ($${p.price})`).join('\\n') || 'None'}
 
-Respond ONLY in clean structured format:
+TOP SELLING:
+${storeData.topProducts.map(p => `• ${p.name}: ${p.quantity} sold`).join('\\n') || 'No sales data'}
 
-Store Summary:
-- point
+MANDATORY RULES:
+1. Use EXACT numbers/names above
+2. "Today's sales" = $${storeData.todaySales} precisely
+3. No vague "checking" - direct facts
+4. Professional store manager
+5. Numbers MUST match data
 
-Alerts:
-- point
+${message}`;
 
-Insights:
-- point
+        return groq.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Data: ${JSON.stringify(storeData)} Answer directly.` }
+            ],
+            model: DEFAULT_GROQ_MODEL,
+            temperature: 0.1,  // FACTS ONLY
+            stream
+        });
 
-Recommendations:
-- point
-
-Rules:
-- Use bullet points
-- Keep short
-- Avoid emojis
-- Avoid long paragraphs
-`;
     } else {
-        systemPrompt = `
-You are a helpful AI assistant.
+        // PERSONAL/GENERAL - PURE AI
+        const systemPrompt = `Friendly personal AI assistant.
 
-Answer naturally and clearly.
+Personal life, weather, recipes, general questions: Answer naturally.
 
-Keep responses short and clean.
-`;
+STRICT: NO STORE MENTION unless store question.
+Conversational, helpful, fun.
+
+${message}`;
+
+        return groq.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: message }
+            ],
+            model: DEFAULT_GROQ_MODEL,
+            temperature: 0.8,  // Natural conversation
+            stream
+        });
     }
-
-    const safeProducts = safeStringifyTrim(products);
-    const safeTransactions = safeStringifyTrim(transactions);
-
-    const prompt = `
-BUSINESS SUMMARY:
-${JSON.stringify(summary)}
-
-PRODUCTS:
-${safeProducts}
-
-TRANSACTIONS:
-${safeTransactions}
-
-USER QUESTION:
-${message}
-`;
-
-    return groq.chat.completions.create({
-        messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: prompt }
-        ],
-        model: DEFAULT_GROQ_MODEL,
-        stream,
-        temperature: 0.3   // updated for cleaner responses
-    });
 };
 
-
-
-// NORMAL CHAT
+// Controllers
 export const chat = asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    const shopId = req.user.shopId;
 
-    try {
-
-        const { message } = req.body;
-        const shopId = req.user.shopId;
-
-        const products = await Product.find({ shopId }).limit(50);
-
-        const transactions = await Transaction
-            .find({ shopId })
-            .sort({ createdAt: -1 })
-            .limit(50);
-
-        const summary = buildBusinessSummary(products, transactions);
-
-        const response = await generateResponse({
-            message,
-            products,
-            transactions,
-            summary
-        });
-
-        res.json({
-            reply: response.choices?.[0]?.message?.content ?? ""
-        });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Chat failed" });
-    }
+    const response = await generateDualResponse(message, shopId);
+    res.json({ reply: response.choices[0].message.content });
 });
 
-
-
-
-// STREAM CHAT
 export const chatStream = asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    const shopId = req.user.shopId;
 
-    try {
+    const stream = await generateDualResponse(message, shopId, true);
 
-        const { message } = req.body;
-        const shopId = req.user.shopId;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
-        const products = await Product.find({ shopId }).limit(50);
-
-        const transactions = await Transaction
-            .find({ shopId })
-            .sort({ createdAt: -1 })
-            .limit(50);
-
-        const summary = buildBusinessSummary(products, transactions);
-
-        const stream = await generateResponse({
-            message,
-            products,
-            transactions,
-            summary,
-            stream: true
-        });
-
-        res.setHeader("Content-Type", "text/plain; charset=utf-8");
-
-        for await (const chunk of stream) {
-            res.write(chunk.choices?.[0]?.delta?.content || "");
-        }
-
-        res.end();
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Stream failed" });
+    for await (const chunk of stream) {
+        const content = chunk.choices?.[0]?.delta?.content;
+        if (content) res.write(content);
     }
+    res.end();
 });

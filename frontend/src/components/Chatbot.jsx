@@ -6,19 +6,19 @@ const suggestions = [
     "Today's sales",
     "Low stock products",
     "Top selling products",
+    "Is iPhone 15 available?",
+    "Check Tesla stock",
     "Business insights",
     "How to increase sales?",
     "Give me store performance"
 ];
 
 const Chatbot = () => {
-
     const [open, setOpen] = useState(false);
     const [minimized, setMinimized] = useState(false);
     const [messages, setMessages] = useState([
         { sender: "bot", text: "Hello 👋 I'm your AI Retail Assistant" }
     ]);
-
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [listening, setListening] = useState(false);
@@ -32,7 +32,6 @@ const Chatbot = () => {
 
     // Voice Setup
     useEffect(() => {
-
         const SpeechRecognition =
             window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -47,7 +46,6 @@ const Chatbot = () => {
 
             recognitionRef.current.onend = () => setListening(false);
         }
-
     }, []);
 
     const startVoice = () => {
@@ -55,8 +53,12 @@ const Chatbot = () => {
         setListening(true);
     };
 
-    const sendMessage = async (msg = input) => {
+    // Convert dollars to rupees
+    const convertCurrency = (text) => {
+        return text.replace(/\$(\d+(?:\.\d{2})?)/g, '₹$1');
+    };
 
+    const sendMessage = async (msg = input) => {
         if (!msg.trim()) return;
 
         const userMessage = {
@@ -65,7 +67,6 @@ const Chatbot = () => {
         };
 
         const updatedMessages = [...messages, userMessage];
-
         setMessages(updatedMessages);
         setInput("");
         setLoading(true);
@@ -79,13 +80,13 @@ const Chatbot = () => {
             message: msg,
             conversationHistory: updatedMessages,
             onChunk: (chunk, fullText) => {
-
+                // Convert currency in real-time as chunks arrive
+                const convertedText = convertCurrency(fullText);
                 setMessages(prev => {
                     const updated = [...prev];
-                    updated[updated.length - 1].text = fullText;
+                    updated[updated.length - 1].text = convertedText;
                     return updated;
                 });
-
             }
         });
 
@@ -98,19 +99,42 @@ const Chatbot = () => {
         ]);
     };
 
-    // Format Message
+    // Enhanced Message Formatting
     const formatMessage = (text) => {
+        if (!text) return null;
+
         return text.split("\n").map((line, i) => {
-
-            if (line.includes(":")) {
-                return <strong key={i}>{line}</strong>;
+            // Product status with ✅/❌
+            if (line.includes("✅") || line.includes("❌")) {
+                return (
+                    <div key={i} className="product-status">
+                        {line}
+                    </div>
+                );
             }
 
-            if (line.startsWith("-")) {
-                return <li key={i}>{line.replace("-", "")}</li>;
+            // Headers with **
+            if (line.includes("**")) {
+                return (
+                    <strong key={i} className="message-header">
+                        {line.replace(/[*]+/g, '')}
+                    </strong>
+                );
             }
 
-            return <p key={i}>{line}</p>;
+            // Bullets
+            if (line.startsWith("•") || line.startsWith("-")) {
+                return (
+                    <li key={i} className="message-bullet">
+                        {line.replace(/[•-]\s*/, '')}
+                    </li>
+                );
+            }
+
+            // Empty lines
+            if (!line.trim()) return <br key={i} />;
+
+            return <p key={i} className="message-paragraph">{line}</p>;
         });
     };
 
@@ -126,34 +150,25 @@ const Chatbot = () => {
 
             {open && (
                 <div className={`chatbot-container ${minimized ? "minimized" : ""}`}>
-
                     {/* Header */}
                     <div className="chatbot-header">
-
                         <div>
                             <h3>AI Retail Assistant</h3>
                             <span>Online</span>
                         </div>
-
                         <div className="chat-actions">
-
                             <button onClick={clearChat}>🗑️</button>
-
                             <button onClick={() => setMinimized(!minimized)}>
                                 {minimized ? "🔼" : "➖"}
                             </button>
-
                             <button onClick={() => setOpen(false)}>❌</button>
-
                         </div>
-
                     </div>
 
                     {!minimized && (
                         <>
                             {/* Messages */}
                             <div className="chatbot-messages">
-
                                 {messages.map((msg, i) => (
                                     <div
                                         key={i}
@@ -167,12 +182,13 @@ const Chatbot = () => {
 
                                 {loading && (
                                     <div className="message bot">
-                                        Typing...
+                                        <div className="message-content">
+                                            Typing...
+                                        </div>
                                     </div>
                                 )}
 
                                 <div ref={bottomRef} />
-
                             </div>
 
                             {/* Suggestions */}
@@ -189,31 +205,26 @@ const Chatbot = () => {
 
                             {/* Input */}
                             <div className="chatbot-input">
-
                                 <input
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Ask anything about your shop..."
+                                    placeholder="Ask about products, sales, stock..."
                                     onKeyDown={(e) =>
                                         e.key === "Enter" && sendMessage()
                                     }
                                 />
-
                                 <button
                                     onClick={startVoice}
                                     className={listening ? "voice active" : "voice"}
                                 >
                                     🎤
                                 </button>
-
                                 <button onClick={() => sendMessage()}>
                                     ➤
                                 </button>
-
                             </div>
                         </>
                     )}
-
                 </div>
             )}
         </>

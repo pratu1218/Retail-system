@@ -27,7 +27,7 @@ const transactionSchema = new mongoose.Schema({
     ref: "User"
   },
 
-  // ✅ Add this
+
   shopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
